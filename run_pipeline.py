@@ -90,7 +90,7 @@ def main():
         
         # Run pipeline
         logger.info(f"Starting pipeline with batch_size={args.batch_size}")
-        success = run_pipeline(batch_size=args.batch_size)
+        success = run_pipeline(batch_size=args.batch_size, triggered_by="manual")
         
         if success:
             logger.info("=" * 50)

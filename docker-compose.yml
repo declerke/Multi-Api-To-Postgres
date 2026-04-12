@@ -1,0 +1,108 @@
+version: '3.8'
+
+# Pipeline env vars injected into all Airflow services.
+# DB_HOST=postgres uses Docker's internal service name (not localhost).
+x-pipeline-env: &pipeline-env
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: etl_pipeline
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  LOG_LEVEL: INFO
+  REQUEST_TIMEOUT: "10"
+  MAX_RETRIES: "3"
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.8.1
+  environment:
+    <<: *pipeline-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    PYTHONPATH: /opt/airflow/project
+    _PIP_ADDITIONAL_REQUIREMENTS: "requests psycopg2-binary python-dotenv"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - airflow_logs:/opt/airflow/logs
+    - .:/opt/airflow/project         # mounts src/, run_pipeline.py, etc.
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ─────────────────────────────────────────────
+  # PostgreSQL — pipeline data + Airflow metadata
+  # Exposed on 5433 to avoid conflict with any local Postgres installation.
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: multi-api-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: etl_pipeline
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init_databases.sh:/docker-entrypoint-initdb.d/00_init.sh
+      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/01_tables.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────────────────────────────────────────
+  # Airflow init — runs once: DB migration + admin user
+  # ─────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin
+    restart: "no"
+
+  # ─────────────────────────────────────────────
+  # Airflow webserver — UI at http://localhost:8080
+  # ─────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ─────────────────────────────────────────────
+  # Airflow scheduler — triggers DAG runs
+  # ─────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  airflow_logs:

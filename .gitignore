@@ -10,3 +10,7 @@ __pycache__/
 # Project specific
 logs/pipeline_*.log
 .pytest_cache/
+
+# Stray files
+*.jpg
+yoh.png

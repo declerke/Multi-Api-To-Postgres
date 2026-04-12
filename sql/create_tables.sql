@@ -5,14 +5,11 @@ CREATE TABLE IF NOT EXISTS advice_quotes (
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS activities (
+CREATE TABLE IF NOT EXISTS quotes (
     id SERIAL PRIMARY KEY,
-    activity_key TEXT UNIQUE NOT NULL,
-    activity TEXT NOT NULL,
-    type TEXT,
-    participants INTEGER,
-    price DECIMAL(3,2),
-    accessibility DECIMAL(3,2),
+    quote_key BIGINT UNIQUE NOT NULL,
+    quote_text TEXT NOT NULL,
+    author TEXT NOT NULL,
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -21,4 +18,18 @@ CREATE TABLE IF NOT EXISTS dog_images (
     breed TEXT,
     image_url TEXT UNIQUE NOT NULL,
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id SERIAL PRIMARY KEY,
+    run_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    triggered_by TEXT NOT NULL DEFAULT 'manual',
+    status TEXT NOT NULL,
+    advice_inserted INTEGER DEFAULT 0,
+    advice_skipped INTEGER DEFAULT 0,
+    quotes_inserted INTEGER DEFAULT 0,
+    quotes_skipped INTEGER DEFAULT 0,
+    dogs_inserted INTEGER DEFAULT 0,
+    dogs_skipped INTEGER DEFAULT 0,
+    duration_seconds NUMERIC(8, 2)
 );

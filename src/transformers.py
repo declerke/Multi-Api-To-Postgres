@@ -3,41 +3,31 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+
 def transform_advice(raw_data):
     if not raw_data or "id" not in raw_data or "advice" not in raw_data:
         return None
     return {
         "advice_id": raw_data["id"],
         "advice_text": raw_data["advice"].strip(),
-        "fetched_at": datetime.now()
+        "fetched_at": datetime.now(),
     }
 
-def transform_activity(raw_data):
-    if not raw_data or "key" not in raw_data:
-        return None
-    return {
-        "activity_key": raw_data["key"],
-        "activity": raw_data["activity"],
-        "type": raw_data["type"],
-        "participants": int(raw_data["participants"]),
-        "price": float(raw_data["price"]),
-        "accessibility": float(raw_data["accessibility"]),
-        "fetched_at": datetime.now()
-    }
 
-def transform_quote_to_activity(raw_data):
+def transform_quote(raw_data):
+    """Transform ZenQuotes response into the quotes table schema."""
     if not raw_data or not isinstance(raw_data, list):
         return None
-    data = raw_data[0] # ZenQuotes returns a list
+    data = raw_data[0]
+    if "q" not in data or "a" not in data:
+        return None
     return {
-        "activity_key": hash(data['q']), # Generate a unique key from the quote
-        "activity": data['q'],
-        "type": f"Quote by {data['a']}",
-        "participants": 1,
-        "price": 0.0,
-        "accessibility": 0.0,
-        "fetched_at": datetime.now()
+        "quote_key": abs(hash(data["q"])),
+        "quote_text": data["q"].strip(),
+        "author": data["a"].strip(),
+        "fetched_at": datetime.now(),
     }
+
 
 def extract_breed_from_url(url):
     try:
@@ -48,6 +38,7 @@ def extract_breed_from_url(url):
     except (ValueError, IndexError):
         return "Unknown"
 
+
 def transform_dog_image(raw_data):
     if not raw_data or "image_url" not in raw_data:
         return None
@@ -55,5 +46,5 @@ def transform_dog_image(raw_data):
     return {
         "image_url": url,
         "breed": extract_breed_from_url(url),
-        "fetched_at": datetime.now()
+        "fetched_at": datetime.now(),
     }
